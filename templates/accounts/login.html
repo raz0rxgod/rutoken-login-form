@@ -1,0 +1,385 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход в систему — Реестр лиц, признанных судом недееспособными</title>
+<script src="{% static 'vendor/rutoken-plugin.min.js' %}"></script>
+<style>
+  {# Стили — без изменений по сути от исходного макета (login.html из первой итерации),
+     сюда перенесены как есть; дизайн-токены стоит вынести в отдельный статический
+     файл, когда появится общий layout для остальных страниц (persons/list.html и т.д.) #}
+  :root {
+    --ink: #1c2733; --ink-soft: #4a5568; --ink-faint: #8b93a1;
+    --paper: #f4f2ec; --panel: #ffffff; --line: #d8d4c8;
+    --navy: #1f3a5f; --navy-deep: #16293f;
+    --err: #8a2e2e; --err-bg: #f7e9e7; --ok: #2f6b4f; --ok-bg: #e8f1ea;
+    --radius: 3px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  body { min-height: 100vh; display: grid; place-items: center; padding: 32px 20px; }
+  .frame { width: 100%; max-width: 880px; display: grid; grid-template-columns: 320px 1fr;
+    background: var(--panel); border: 1px solid var(--line); }
+  @media (max-width: 720px) { .frame { grid-template-columns: 1fr; } .info { display: none; } }
+  .info { background: var(--navy-deep); color: #dfe6ee; padding: 40px 32px; display: flex;
+    flex-direction: column; justify-content: space-between; }
+  .info-top .mark { width: 40px; height: 40px; border: 1.5px solid #7c93ac; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-family: Georgia, serif;
+    font-size: 17px; color: #cdd9e5; margin-bottom: 28px; }
+  .info-top .system-name { font-family: Georgia, serif; font-size: 21px; line-height: 1.4;
+    color: #f2f4f7; margin: 0 0 10px; }
+  .info-top .authority { font-size: 13px; color: #9fb0c3; line-height: 1.6; margin: 0; }
+  .info-mid { margin: 36px 0; padding-top: 24px; border-top: 1px solid #2b4260; }
+  .info-mid p { font-size: 12.5px; line-height: 1.7; color: #a9b8c9; margin: 0; }
+  .info-bottom { font-size: 11.5px; color: #71839a; line-height: 1.6; }
+  .info-bottom .req { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; }
+  .form-side { padding: 44px 44px; display: flex; flex-direction: column; }
+  @media (max-width: 480px) { .form-side { padding: 32px 22px; } }
+  .form-side h1 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; margin: 0 0 6px; }
+  .form-side .sub { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 32px; line-height: 1.6; }
+  .steps { display: flex; gap: 6px; margin-bottom: 30px; }
+  .steps .seg { height: 2px; flex: 1; background: var(--line); }
+  .steps .seg.done { background: var(--navy); }
+  .panel-body { min-height: 260px; }
+  .state { display: none; } .state.active { display: block; }
+  .token-visual { width: 100%; border: 1px dashed var(--line); border-radius: var(--radius);
+    padding: 30px 20px; display: flex; flex-direction: column; align-items: center;
+    text-align: center; background: #fbfaf7; }
+  .token-icon { width: 46px; height: 46px; margin-bottom: 14px; }
+  .token-visual .t-title { font-size: 14.5px; margin: 0 0 4px; font-weight: 600; }
+  .token-visual .t-sub { font-size: 12.5px; color: var(--ink-faint); margin: 0; }
+  button { font-family: inherit; cursor: pointer; }
+  .btn-primary { width: 100%; margin-top: 22px; background: var(--navy); color: #f4f6f8;
+    border: 1px solid var(--navy); border-radius: var(--radius); padding: 12px 16px;
+    font-size: 14px; font-weight: 600; }
+  .btn-primary:hover { background: var(--navy-deep); }
+  .btn-primary:disabled { background: #b9c2cd; border-color: #b9c2cd; cursor: not-allowed; }
+  .btn-ghost { width: 100%; margin-top: 10px; background: transparent; color: var(--ink-soft);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px; font-size: 13px; }
+  .btn-ghost:hover { border-color: var(--ink-faint); color: var(--ink); }
+  .spin { width: 30px; height: 30px; border: 2.5px solid var(--line); border-top-color: var(--navy);
+    border-radius: 50%; margin: 0 auto 16px; animation: rot .8s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .detecting p { text-align: center; font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+  .cert-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px;
+    background: #fbfaf7; display: flex; gap: 12px; align-items: flex-start; }
+  .cert-card .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+    margin-top: 5px; flex-shrink: 0; }
+  .cert-card .name { font-size: 14px; font-weight: 600; margin: 0 0 3px; }
+  .cert-card .meta { font-size: 12px; color: var(--ink-faint); margin: 0; line-height: 1.6; }
+  .field { margin-top: 20px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+    margin-bottom: 7px; }
+  .pin-row { display: flex; gap: 10px; }
+  .pin-row input { flex: 1; font-family: inherit; font-size: 15px; letter-spacing: 2px;
+    padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+  .pin-row input:focus { outline: none; border-color: var(--navy);
+    box-shadow: 0 0 0 3px rgba(31,58,95,.09); }
+  .pin-toggle { border: 1px solid var(--line); background: #fff; border-radius: var(--radius);
+    padding: 0 14px; font-size: 12px; color: var(--ink-soft); }
+  .field-err { display: none; font-size: 12.5px; color: var(--err); margin-top: 7px; }
+  .field-err.show { display: block; }
+  .banner { display: none; border-radius: var(--radius); padding: 12px 14px; font-size: 13px;
+    line-height: 1.5; margin-bottom: 18px; }
+  .banner.show { display: block; }
+  .banner.err { background: var(--err-bg); color: var(--err); border: 1px solid #e3c3c1; }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid #c3ddc9; }
+  .success-box { text-align: center; padding: 20px 0 4px; }
+  .success-box .ring { width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--ok);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .success-box p { font-size: 14px; margin: 0 0 4px; }
+  .success-box .sm { font-size: 12.5px; color: var(--ink-faint); }
+  .foot-note { margin-top: auto; padding-top: 28px; font-size: 11.5px; color: var(--ink-faint);
+    line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <aside class="info">
+    <div class="info-top">
+      <div class="mark">РА</div>
+      <p class="system-name">Реестр лиц, признанных&nbsp;судом недееспособными</p>
+      <p class="authority">Верховный суд Республики Абхазия</p>
+    </div>
+    <div class="info-mid">
+      <p>Доступ к системе предоставляется только с использованием квалифицированного носителя ключевой информации (Рутокен). Вход по логину и паролю не предусмотрен.</p>
+    </div>
+    <div class="info-bottom">
+      <div class="req"><span>—</span><span>Носитель должен быть подключён к порту USB до начала сеанса</span></div>
+      <div class="req"><span>—</span><span>Требуется установленный «Рутокен Плагин» (расширение браузера «Адаптер Рутокен Плагин»)</span></div>
+      <div class="req"><span>—</span><span>Сертификат должен быть действителен и включён в список допущенных пользователей системы</span></div>
+    </div>
+  </aside>
+
+  <section class="form-side">
+    <div class="steps"><div class="seg" id="seg1"></div><div class="seg" id="seg2"></div><div class="seg" id="seg3"></div></div>
+
+    <div class="banner err" id="errBanner"></div>
+
+    <div class="panel-body">
+      <div class="state active" id="state-idle">
+        <h1>Вход по Рутокену</h1>
+        <p class="sub">Подключите носитель к компьютеру и нажмите «Считать токен», чтобы система определила сертификат.</p>
+        <div class="token-visual">
+          <svg class="token-icon" viewBox="0 0 48 48" fill="none">
+            <rect x="10" y="14" width="28" height="20" rx="2" stroke="#8b93a1" stroke-width="1.6"/>
+            <rect x="14" y="19" width="20" height="3" rx="1" fill="#c7ccd4"/>
+            <rect x="14" y="24" width="12" height="3" rx="1" fill="#c7ccd4"/>
+            <path d="M17 14V10.5C17 9.11929 18.1193 8 19.5 8H28.5C29.8807 8 31 9.11929 31 10.5V14" stroke="#8b93a1" stroke-width="1.6"/>
+          </svg>
+          <p class="t-title" id="tokenTitle">Носитель не обнаружен</p>
+          <p class="t-sub" id="tokenSub">Ожидание подключения USB-токена</p>
+        </div>
+        <button class="btn-primary" id="btnScan">Считать токен</button>
+      </div>
+
+      <div class="state" id="state-detecting">
+        <h1>Определение сертификата</h1>
+        <p class="sub">Не извлекайте носитель во время проверки.</p>
+        <div class="detecting" style="padding:30px 0 10px;"><div class="spin"></div><p>Считывание сертификата с токена…</p></div>
+      </div>
+
+      <div class="state" id="state-pin">
+        <h1>Подтверждение доступа</h1>
+        <p class="sub">Сертификат найден. Введите PIN-код носителя для завершения входа.</p>
+        <div class="cert-card">
+          <span class="dot"></span>
+          <div><p class="name" id="certName">—</p><p class="meta" id="certMeta">—</p></div>
+        </div>
+        <div class="field">
+          <label for="pinInput">PIN-код Рутокена</label>
+          <div class="pin-row">
+            <input type="password" id="pinInput" inputmode="numeric" autocomplete="off" placeholder="••••••" maxlength="12">
+            <button class="pin-toggle" id="pinToggle" type="button">Показать</button>
+          </div>
+          <p class="field-err" id="pinErr">Введите PIN-код носителя</p>
+        </div>
+        <button class="btn-primary" id="btnSubmitPin">Войти в систему</button>
+        <button class="btn-ghost" id="btnCancel">Отменить и извлечь токен</button>
+      </div>
+
+      <div class="state" id="state-verifying">
+        <h1>Проверка доступа</h1>
+        <div class="detecting" style="padding:30px 0 10px;"><div class="spin"></div><p>Проверка PIN-кода и прав доступа…</p></div>
+      </div>
+
+      <div class="state" id="state-success">
+        <div class="success-box">
+          <div class="ring"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10.5L8 14.5L16 6" stroke="#2f6b4f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <p>Доступ подтверждён</p><p class="sm">Перенаправление…</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="foot-note">Все попытки входа фиксируются в неизменяемом журнале действий системы. Извлечение носителя во время сессии автоматически завершает работу.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var states = ['idle', 'detecting', 'pin', 'verifying', 'success'];
+  var NEXT_URL = "{{ next_url|escapejs }}";
+
+  function show(id) {
+    states.forEach(function (s) { document.getElementById('state-' + s).classList.toggle('active', s === id); });
+    var segMap = { idle: 0, detecting: 1, pin: 2, verifying: 2, success: 3 };
+    [1, 2, 3].forEach(function (n) { document.getElementById('seg' + n).classList.toggle('done', n <= segMap[id]); });
+  }
+
+  function showError(message) {
+    var el = document.getElementById('errBanner');
+    el.textContent = message;
+    el.classList.add('show');
+  }
+  function hideError() { document.getElementById('errBanner').classList.remove('show'); }
+
+  function getCookie(name) {
+    var value = '; ' + document.cookie;
+    var parts = value.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  }
+  var csrftoken = getCookie('csrftoken');
+
+  function apiFetch(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      credentials: 'same-origin',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  /*
+   * ТОЧКА ИНТЕГРАЦИИ: «Рутокен Плагин» (браузерное расширение «Адаптер
+   * Рутокен Плагин», https://www.rutoken.ru/products/all/rutoken-plugin/).
+   *
+   * ИСПРАВЛЕНО 07.09.2026 (первый раз): изначально здесь и в тексте страницы
+   * фигурировал несуществующий продукт «Рутокен ЭЦП Browser extension» —
+   * реальное название подтверждено пользователем при тестовом развёртывании.
+   *
+   * ИСПРАВЛЕНО 07.09.2026 (второй раз): диагностирована причина ошибки
+   * «Не найден «Рутокен Плагин»» — в странице вообще не был подключён
+   * официальный JS-загрузчик плагина. Теперь подключён настоящий
+   * `@aktivco/rutoken-plugin` (npm, репозиторий AktivCo/rutoken-plugin-js,
+   * файл vendored как есть в static/vendor/rutoken-plugin.min.js — там нет
+   * сборочного пайплайна для npm-пакетов, поэтому не через npm/webpack).
+   * Загрузчик действительно создаёт глобальный `window.rutoken`, но его
+   * подтверждённый API — только это:
+   *   rutoken.ready -> Promise
+   *   rutoken.isExtensionInstalled() -> Promise<bool>
+   *   rutoken.isPluginInstalled() -> Promise<bool>
+   *   rutoken.loadPlugin() -> Promise<pluginObject>
+   *
+   * Методы `enumerateDevices`/`getCertificate`/`sign`, которые вызывает код
+   * ниже, — это НЕ часть загрузчика, а предполагаемые методы объекта,
+   * который вернёт `loadPlugin()` (сам он реализован самим расширением —
+   * загрузчик лишь оборачивает то, что отдаёт нативная часть, см. функцию
+   * `p()`/`l()` в rutoken-plugin.min.js: она проксирует ЛЮБЫЕ методы
+   * возвращённого объекта как есть, под их настоящими именами). Эти три
+   * имени по-прежнему НЕ ПРОВЕРЕНЫ против реального расширения — открытой
+   * документации на сам API объекта плагина (в отличие от загрузчика) найти
+   * не удалось, она обычно выдаётся Аладдин Р.Д. вместе с личным кабинетом
+   * разработчика.
+   *
+   * ЧТО ДЕЛАТЬ ПРИ СЛЕДУЮЩЕЙ ОШИБКЕ (уже не «не найден плагин», а
+   * TypeError вида "plugin.enumerateDevices is not a function"):
+   *   1. открыть страницу с реально подключённым токеном и консоль браузера;
+   *   2. в блоке catch ниже уже стоит `console.log(plugin)` — раскрыть
+   *      объект в консоли и посмотреть реальные имена методов;
+   *   3. заменить `enumerateDevices`/`getCertificate`/`sign` ниже на
+   *      настоящие имена — контракт с бэкендом (apps.accounts.serializers)
+   *      от этого не изменится, меняется только этот файл.
+   */
+  var rutokenPlugin = null; // объект, который вернул rutoken.loadPlugin()
+  var pluginSession = null; // { deviceId, containerName, certificateDer }
+
+  function arrayBufferToBase64(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var binary = '';
+    for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return window.btoa(binary);
+  }
+
+  async function ensurePluginLoaded() {
+    if (rutokenPlugin) return rutokenPlugin;
+    if (!window.rutoken) {
+      throw new Error('Не найден загрузчик «Рутокен Плагин» (не подключился static/vendor/rutoken-plugin.min.js).');
+    }
+    await window.rutoken.ready;
+    var extensionOk = await window.rutoken.isExtensionInstalled();
+    if (!extensionOk) {
+      throw new Error('Не найдено расширение «Адаптер Рутокен Плагин». Установите его и обновите страницу.');
+    }
+    var pluginOk = await window.rutoken.isPluginInstalled();
+    if (!pluginOk) {
+      throw new Error('Расширение найдено, но сам «Рутокен Плагин» не установлен. Установите его и обновите страницу.');
+    }
+    rutokenPlugin = await window.rutoken.loadPlugin();
+    return rutokenPlugin;
+  }
+
+  async function detectTokenAndCertificate() {
+    var plugin = await ensurePluginLoaded();
+    try {
+      var devices = await plugin.enumerateDevices();
+      if (!devices || devices.length === 0) {
+        throw new Error('Носитель не обнаружен. Подключите Рутокен к USB-порту.');
+      }
+      var device = devices[0];
+      var certificateDer = await plugin.getCertificate(device.deviceId, device.containerName);
+      pluginSession = { deviceId: device.deviceId, containerName: device.containerName, certificateDer: certificateDer };
+      return { subjectDN: device.subjectDN || 'Владелец сертификата', containerName: device.containerName };
+    } catch (err) {
+      // Диагностика для следующего шага интеграции — см. комментарий выше.
+      // eslint-disable-next-line no-console
+      console.error('Объект «Рутокен Плагин», реальные методы которого нужно сверить:', plugin);
+      throw err;
+    }
+  }
+
+  async function signChallenge(challenge, pin) {
+    if (!pluginSession || !rutokenPlugin) throw new Error('Сертификат не считан — начните сначала.');
+    var challengeBytes = new TextEncoder().encode(challenge);
+    var signature = await rutokenPlugin.sign(pluginSession.deviceId, pluginSession.containerName, challengeBytes, pin);
+    return arrayBufferToBase64(signature);
+  }
+
+  document.getElementById('btnScan').addEventListener('click', async function () {
+    hideError();
+    show('detecting');
+    try {
+      var certInfo = await detectTokenAndCertificate();
+      document.getElementById('certName').textContent = certInfo.subjectDN;
+      document.getElementById('certMeta').textContent = 'Контейнер: ' + certInfo.containerName;
+      show('pin');
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinInput').focus();
+    } catch (err) {
+      showError(err.message || 'Не удалось считать сертификат с носителя.');
+      show('idle');
+    }
+  });
+
+  document.getElementById('pinToggle').addEventListener('click', function () {
+    var input = document.getElementById('pinInput');
+    var isPwd = input.type === 'password';
+    input.type = isPwd ? 'text' : 'password';
+    this.textContent = isPwd ? 'Скрыть' : 'Показать';
+  });
+
+  document.getElementById('btnCancel').addEventListener('click', function () {
+    hideError();
+    pluginSession = null;
+    show('idle');
+  });
+
+  document.getElementById('btnSubmitPin').addEventListener('click', async function () {
+    var pin = document.getElementById('pinInput').value.trim();
+    var err = document.getElementById('pinErr');
+    if (!pin) { err.classList.add('show'); return; }
+    err.classList.remove('show');
+    hideError();
+    show('verifying');
+
+    try {
+      var challengeResp = await apiFetch('/api/accounts/auth/challenge/');
+      if (!challengeResp.ok) throw new Error('Не удалось получить challenge от сервера.');
+      var challengeData = await challengeResp.json();
+
+      var signatureB64 = await signChallenge(challengeData.challenge, pin);
+      var certificateB64 = arrayBufferToBase64(pluginSession.certificateDer);
+
+      var loginResp = await apiFetch('/api/accounts/auth/login/', {
+        certificate: certificateB64,
+        signature: signatureB64,
+        challenge: challengeData.challenge,
+      });
+
+      if (loginResp.ok) {
+        show('success');
+        window.location.href = NEXT_URL;
+        return;
+      }
+
+      var errData = await loginResp.json().catch(function () { return {}; });
+      showError(errData.detail || 'Не удалось подтвердить подлинность сертификата.');
+      show('pin');
+    } catch (e) {
+      showError(e.message || 'Ошибка при подписи данных на носителе.');
+      show('pin');
+    }
+  });
+
+  document.getElementById('pinInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('btnSubmitPin').click();
+  });
+})();
+</script>
+
+</body>
+</html>
